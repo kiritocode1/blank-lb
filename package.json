@@ -1,22 +1,47 @@
 {
-  "name": "blank-lb",
-  "module": "index.ts",
+  "name": "@blank-utils/load-balancer",
+  "version": "0.1.0",
+  "description": "A Cloudflare Workers-based load balancer built with Effect-TS",
   "type": "module",
-  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "prepare": "effect-language-service patch",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
   },
+  "keywords": [
+    "effect",
+    "cloudflare-workers",
+    "load-balancer",
+    "failover",
+    "geo-steering"
+  ],
+  "author": "blank",
+  "license": "MIT",
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260129.0",
     "@effect/language-service": "^0.72.0",
     "@effect/vitest": "^0.27.0",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
-    "typescript": "^5.9.3"
+    "effect": "^3.0.0"
   },
   "dependencies": {
-    "@effect/platform": "^0.94.2",
     "effect": "^3.19.15"
   }
 }
