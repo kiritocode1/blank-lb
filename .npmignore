@@ -1,0 +1,60 @@
+# Source files are included (for debugging), but not test files
+**/*.test.ts
+**/*.spec.ts
+
+# Development documentation
+ARCHITECTURE.md
+AGENTS.md
+CLAUDE.md
+
+# Config files
+tsconfig.json
+tsconfig.build.json
+tsconfig.tsbuildinfo
+.gitignore
+.editorconfig
+.prettierrc
+.eslintrc*
+
+# Development directories
+node_modules/
+coverage/
+.github/
+
+# Agent/IDE configs
+.agent/
+.agents/
+.claude/
+.cline/
+.codebuddy/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.mux/
+.neovate/
+.opencode/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+.reference/
+skills/
+
+# Lock files (not needed for library consumers)
+bun.lock
+bun.lockb
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

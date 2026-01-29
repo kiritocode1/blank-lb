@@ -1,9 +1,8 @@
 # dependencies (bun install)
 node_modules
 
-# output
+# output (dist is committed for npm)
 out
-dist
 *.tgz
 
 # code coverage
@@ -32,4 +31,37 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# References
 .reference/
+
+# Agent/IDE config directories
+.agent/
+.agents/
+.claude/
+.cline/
+.codebuddy/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.mux/
+.neovate/
+.opencode/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills/
+
