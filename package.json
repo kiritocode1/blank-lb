@@ -1,6 +1,6 @@
 {
   "name": "@blank-utils/load-balancer",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "A type-safe, composable load balancer for Cloudflare Workers built with Effect-TS",
   "type": "module",
   "main": "./dist/index.js",
