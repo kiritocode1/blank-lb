@@ -59,6 +59,62 @@ npm install @blank-utils/load-balancer effect
 
 ---
 
+## Client Usage
+
+Once your Worker is deployed, clients call your Worker URL directly. The load balancer handles routing to backends transparently:
+
+```typescript
+// Your Worker is deployed at: https://my-lb.workers.dev
+
+// GET request
+const users = await fetch("https://my-lb.workers.dev/users")
+  .then(r => r.json())
+
+// GET with ID
+const user = await fetch("https://my-lb.workers.dev/users/123")
+  .then(r => r.json())
+
+// POST request
+const newUser = await fetch("https://my-lb.workers.dev/users", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "John", email: "john@example.com" })
+}).then(r => r.json())
+
+// PUT request with auth
+await fetch("https://my-lb.workers.dev/users/123", {
+  method: "PUT",
+  headers: { 
+    "Content-Type": "application/json",
+    "Authorization": "Bearer your-token"
+  },
+  body: JSON.stringify({ name: "John Updated" })
+})
+
+// DELETE request
+await fetch("https://my-lb.workers.dev/users/123", {
+  method: "DELETE",
+  headers: { "Authorization": "Bearer your-token" }
+})
+```
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Worker as my-lb.workers.dev
+    participant Backend as api1.example.com
+    
+    Client->>Worker: GET /users/123
+    Note over Worker: Load balancer picks backend
+    Worker->>Backend: GET /users/123
+    Backend-->>Worker: {id: 123, name: "John"}
+    Worker-->>Client: {id: 123, name: "John"}<br/>+ X-Load-Balancer-Endpoint header
+```
+
+Clients don't know about your backends — they just call your Worker URL!
+
+---
+
 ## Examples
 
 ### 1. Basic Load Balancer
@@ -96,6 +152,36 @@ export default {
 2. Load balancer forwards request to first endpoint
 3. If it fails (502, 503, 504, or network error), tries the next endpoint
 4. Response is returned to user with added observability headers
+
+**How REST API routes work:**
+
+The load balancer is a **transparent proxy**. Your API routes (`/users`, `/products`, `/orders`) are defined on your backend servers — the load balancer just forwards everything:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LB as Load Balancer
+    participant Backend
+    
+    Client->>LB: GET /users/123
+    Note over LB: Forwards entire request<br/>(path, method, headers, body)
+    LB->>Backend: GET /users/123
+    Backend-->>LB: {id: 123, name: "John"}
+    LB-->>Client: {id: 123, name: "John"}
+```
+
+Your backend servers handle routes like:
+- `GET /users` → List users
+- `POST /users` → Create user
+- `GET /users/:id` → Get user by ID
+- `PUT /users/:id` → Update user
+- `DELETE /users/:id` → Delete user
+
+The load balancer preserves:
+- ✅ Request path (`/users/123`)
+- ✅ HTTP method (`GET`, `POST`, `PUT`, `DELETE`)
+- ✅ Headers (`Authorization`, `Content-Type`, etc.)
+- ✅ Request body (JSON, form data, etc.)
 
 ---
 

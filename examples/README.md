@@ -157,6 +157,41 @@ flowchart TB
     style Recovery fill:#ff9800
 ```
 
+### [rest-api.ts](./workers/rest-api.ts)
+Transparent proxy for REST APIs. Shows how the load balancer forwards all routes to backends.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LB as Load Balancer
+    participant Backend
+    
+    Client->>LB: GET /users/123
+    LB->>Backend: GET /users/123
+    Backend-->>LB: {id: 123, name: "John"}
+    LB-->>Client: {id: 123, name: "John"}
+```
+
+### [rest-api-middleware.ts](./workers/rest-api-middleware.ts)
+Add middleware logic: authentication, request transformation, response modification, local routes.
+
+```mermaid
+flowchart TB
+    Request([Request]) --> Check{Path?}
+    Check -->|/health| Local[Respond Locally]
+    Check -->|Other| Auth{Authenticated?}
+    Auth -->|No| Reject[401 Unauthorized]
+    Auth -->|Yes| Transform[Add Headers]
+    Transform --> LB[Load Balancer]
+    LB --> Backend[Backend]
+    Backend --> Modify[Add CORS, Cache]
+    Modify --> Response([Response])
+    
+    style Local fill:#4caf50,color:#fff
+    style Reject fill:#f44336,color:#fff
+    style LB fill:#2196f3,color:#fff
+```
+
 ## Integration Testing
 
 See the [integration/](./integration/) directory for testing the load balancer locally with Wrangler dev server.
