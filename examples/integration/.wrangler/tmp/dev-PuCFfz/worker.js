@@ -28280,14 +28280,33 @@ var RequestForwardError = class extends Data_exports.TaggedError(
 };
 
 // ../../src/Forward.ts
-var forwardRequest = /* @__PURE__ */ __name((endpoint2, request2) => Effect_exports.gen(function* () {
+var BODYLESS_METHODS = ["GET", "HEAD", "OPTIONS"];
+var methodSupportsBody = /* @__PURE__ */ __name((method) => !BODYLESS_METHODS.includes(method.toUpperCase()), "methodSupportsBody");
+var bufferRequestBody = /* @__PURE__ */ __name((request2) => Effect_exports.gen(function* () {
+  if (!methodSupportsBody(request2.method)) {
+    return null;
+  }
+  if (!request2.body) {
+    return null;
+  }
+  const body = yield* Effect_exports.tryPromise({
+    try: /* @__PURE__ */ __name(() => request2.arrayBuffer(), "try"),
+    catch: /* @__PURE__ */ __name((cause3) => new RequestForwardError({
+      endpoint: { url: request2.url },
+      cause: cause3
+    }), "catch")
+  });
+  return body;
+}), "bufferRequestBody");
+var forwardRequest = /* @__PURE__ */ __name((endpoint2, request2, bufferedBody = null) => Effect_exports.gen(function* () {
   const url2 = new URL(request2.url);
   const targetUrl = endpoint2.buildTargetUrl(url2.pathname, url2.search);
+  const body = methodSupportsBody(request2.method) ? bufferedBody : null;
   const response = yield* Effect_exports.tryPromise({
     try: /* @__PURE__ */ __name(() => fetch(targetUrl, {
       method: request2.method,
       headers: request2.headers,
-      body: request2.body,
+      body,
       redirect: "follow",
       signal: AbortSignal.timeout(endpoint2.timeoutMs)
     }), "try"),
@@ -28330,6 +28349,10 @@ var addLoadBalancerHeaders = /* @__PURE__ */ __name((response, endpoint2, triedE
 }, "addLoadBalancerHeaders");
 
 // ../../src/HealthChecker.ts
+var getHealthCheckTimeout = /* @__PURE__ */ __name((endpoint2) => {
+  const halfTimeout = Math.floor(endpoint2.timeoutMs / 2);
+  return Math.max(1e3, Math.min(halfTimeout, 1e4));
+}, "getHealthCheckTimeout");
 var HealthChecker = class extends Context_exports.Tag("@blank-utils/HealthChecker")() {
   static {
     __name(this, "HealthChecker");
@@ -28337,12 +28360,19 @@ var HealthChecker = class extends Context_exports.Tag("@blank-utils/HealthChecke
 };
 var HealthCheckerLive = Layer_exports.succeed(HealthChecker, {
   check: /* @__PURE__ */ __name((endpoint2) => Effect_exports.gen(function* () {
+    const timeoutMs = getHealthCheckTimeout(endpoint2);
     const response = yield* Effect_exports.tryPromise({
       try: /* @__PURE__ */ __name(() => fetch(endpoint2.healthCheckUrl, {
         method: "GET",
-        signal: AbortSignal.timeout(5e3)
+        // Single timeout via AbortSignal (removed redundant Effect.timeout)
+        signal: AbortSignal.timeout(timeoutMs)
       }), "try"),
-      catch: /* @__PURE__ */ __name(() => new EndpointUnhealthyError({ endpoint: endpoint2, reason: "network" }), "catch")
+      catch: /* @__PURE__ */ __name((cause3) => {
+        if (cause3 instanceof Error && cause3.name === "TimeoutError") {
+          return new EndpointUnhealthyError({ endpoint: endpoint2, reason: "timeout" });
+        }
+        return new EndpointUnhealthyError({ endpoint: endpoint2, reason: "network" });
+      }, "catch")
     });
     if (!response.ok) {
       return yield* new EndpointUnhealthyError({
@@ -28352,15 +28382,7 @@ var HealthCheckerLive = Layer_exports.succeed(HealthChecker, {
       });
     }
     return true;
-  }).pipe(
-    Effect_exports.timeout("5 seconds"),
-    Effect_exports.catchTag(
-      "TimeoutException",
-      () => Effect_exports.fail(
-        new EndpointUnhealthyError({ endpoint: endpoint2, reason: "timeout" })
-      )
-    )
-  ), "check")
+  }), "check")
 });
 var HealthCheckerTest = Layer_exports.succeed(HealthChecker, {
   check: /* @__PURE__ */ __name(() => Effect_exports.succeed(true), "check")
@@ -28398,10 +28420,16 @@ var failForward = /* @__PURE__ */ __name((endpoints, request2, failoverStatuses 
   const startTime = Date.now();
   const tried = [];
   let lastError;
+  const bufferedBody = yield* bufferRequestBody(request2).pipe(
+    Effect_exports.catchAll((error) => {
+      lastError = error;
+      return Effect_exports.succeed(null);
+    })
+  );
   for (const endpoint2 of endpoints) {
     tried.push(endpoint2);
     const gatherTime = Date.now();
-    const result = yield* forwardRequest(endpoint2, request2).pipe(
+    const result = yield* forwardRequest(endpoint2, request2, bufferedBody).pipe(
       Effect_exports.either
     );
     if (result._tag === "Right") {
@@ -28430,12 +28458,18 @@ var asyncBlock = /* @__PURE__ */ __name((endpoints, request2) => Effect_exports.
   const checker = yield* HealthChecker;
   const tried = [];
   let lastError;
+  const bufferedBody = yield* bufferRequestBody(request2).pipe(
+    Effect_exports.catchAll((error) => {
+      lastError = error;
+      return Effect_exports.succeed(null);
+    })
+  );
   for (const endpoint2 of endpoints) {
     tried.push(endpoint2);
     const gatherTime = Date.now();
     const healthResult = yield* checker.check(endpoint2).pipe(Effect_exports.either);
     if (healthResult._tag === "Right") {
-      const forwardResult = yield* forwardRequest(endpoint2, request2).pipe(
+      const forwardResult = yield* forwardRequest(endpoint2, request2, bufferedBody).pipe(
         Effect_exports.either
       );
       if (forwardResult._tag === "Right") {
@@ -28465,6 +28499,9 @@ var promiseAny = /* @__PURE__ */ __name((endpoints, request2) => Effect_exports.
       triedEndpoints: []
     });
   }
+  const bufferedBody = yield* bufferRequestBody(request2).pipe(
+    Effect_exports.catchAll(() => Effect_exports.succeed(null))
+  );
   const healthyEndpointResult = yield* Effect_exports.raceAll(
     endpoints.map(
       (endpoint3) => checker.check(endpoint3).pipe(
@@ -28483,10 +28520,11 @@ var promiseAny = /* @__PURE__ */ __name((endpoints, request2) => Effect_exports.
   }
   const endpoint2 = healthyEndpointResult.value;
   const gatherTime = Date.now();
-  const response = yield* forwardRequest(endpoint2, request2).pipe(
+  const response = yield* forwardRequest(endpoint2, request2, bufferedBody).pipe(
     Effect_exports.mapError(
       (error) => new NoHealthyEndpointsError({
-        triedEndpoints: [endpoint2],
+        triedEndpoints: [...endpoints],
+        // Fixed: was [endpoint]
         lastError: error
       })
     )

@@ -51,7 +51,14 @@ export {
 export { LoadBalancer } from "./LoadBalancer.js"
 export type { LoadBalancerOptions, CfRequest, SteeringConfig } from "./LoadBalancer.js"
 
-export { HealthChecker, HealthCheckerLive, HealthCheckerTest } from "./HealthChecker.js"
+export {
+    HealthChecker,
+    HealthCheckerLive,
+    HealthCheckerTest,
+    makeHealthChecker,
+    getHealthCheckTimeout,
+    DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
+} from "./HealthChecker.js"
 
 // Availability methods
 export {
@@ -78,4 +85,9 @@ export type { RecoveryContext, RecoveryFn } from "./Recovery.js"
 export { HEADERS, addLoadBalancerHeaders } from "./Headers.js"
 
 // Forward
-export { forwardRequest } from "./Forward.js"
+export {
+    forwardRequest,
+    bufferRequestBody,
+    methodSupportsBody,
+} from "./Forward.js"
+export type { BufferedBody } from "./Forward.js"

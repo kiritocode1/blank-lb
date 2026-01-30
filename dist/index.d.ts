@@ -35,12 +35,13 @@ export type { GeoContinentConfig, GeoCountryConfig, GeoRegionConfig, GeoColoConf
 export { NoHealthyEndpointsError, EndpointUnhealthyError, CircuitOpenError, RequestForwardError, } from "./Errors.js";
 export { LoadBalancer } from "./LoadBalancer.js";
 export type { LoadBalancerOptions, CfRequest, SteeringConfig } from "./LoadBalancer.js";
-export { HealthChecker, HealthCheckerLive, HealthCheckerTest } from "./HealthChecker.js";
+export { HealthChecker, HealthCheckerLive, HealthCheckerTest, makeHealthChecker, getHealthCheckTimeout, DEFAULT_HEALTH_CHECK_TIMEOUT_MS, } from "./HealthChecker.js";
 export { AvailabilityMethod, AvailabilityMethodType, FailForwardOptions, AsyncBlockOptions, PromiseAnyOptions, DEFAULT_FAILOVER_STATUSES, failForward, asyncBlock, promiseAny, } from "./AvailabilityMethod.js";
 export { selectGeoEndpoints } from "./GeoSteering.js";
 export type { CfProperties } from "./GeoSteering.js";
 export { withRecovery } from "./Recovery.js";
 export type { RecoveryContext, RecoveryFn } from "./Recovery.js";
 export { HEADERS, addLoadBalancerHeaders } from "./Headers.js";
-export { forwardRequest } from "./Forward.js";
+export { forwardRequest, bufferRequestBody, methodSupportsBody, } from "./Forward.js";
+export type { BufferedBody } from "./Forward.js";
 //# sourceMappingURL=index.d.ts.map

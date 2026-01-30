@@ -6,7 +6,7 @@
 import { Effect, Schema } from "effect"
 import type { Endpoint } from "./Endpoint.js"
 import { NoHealthyEndpointsError } from "./Errors.js"
-import { forwardRequest } from "./Forward.js"
+import { bufferRequestBody, forwardRequest, type BufferedBody } from "./Forward.js"
 import { addLoadBalancerHeaders } from "./Headers.js"
 import { HealthChecker } from "./HealthChecker.js"
 
@@ -69,6 +69,8 @@ export type AvailabilityMethod = typeof AvailabilityMethod.Type
 /**
  * Fail-forward strategy:
  * Try endpoints in order, failover only on specific status codes or network errors.
+ * 
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export const failForward = (
     endpoints: ReadonlyArray<Endpoint>,
@@ -80,11 +82,19 @@ export const failForward = (
         const tried: Endpoint[] = []
         let lastError: unknown
 
+        // Buffer body once for all retry attempts (fixes body consumption issue)
+        const bufferedBody: BufferedBody = yield* bufferRequestBody(request).pipe(
+            Effect.catchAll((error) => {
+                lastError = error
+                return Effect.succeed(null)
+            }),
+        )
+
         for (const endpoint of endpoints) {
             tried.push(endpoint)
             const gatherTime = Date.now()
 
-            const result = yield* forwardRequest(endpoint, request).pipe(
+            const result = yield* forwardRequest(endpoint, request, bufferedBody).pipe(
                 Effect.either,
             )
 
@@ -118,6 +128,8 @@ export const failForward = (
 /**
  * Async-block strategy:
  * Sequentially check each endpoint's health, use the first healthy one.
+ * 
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export const asyncBlock = (
     endpoints: ReadonlyArray<Endpoint>,
@@ -129,6 +141,14 @@ export const asyncBlock = (
         const tried: Endpoint[] = []
         let lastError: unknown
 
+        // Buffer body once for all retry attempts
+        const bufferedBody: BufferedBody = yield* bufferRequestBody(request).pipe(
+            Effect.catchAll((error) => {
+                lastError = error
+                return Effect.succeed(null)
+            }),
+        )
+
         for (const endpoint of endpoints) {
             tried.push(endpoint)
             const gatherTime = Date.now()
@@ -137,7 +157,7 @@ export const asyncBlock = (
 
             if (healthResult._tag === "Right") {
                 // Endpoint is healthy, forward the request
-                const forwardResult = yield* forwardRequest(endpoint, request).pipe(
+                const forwardResult = yield* forwardRequest(endpoint, request, bufferedBody).pipe(
                     Effect.either,
                 )
 
@@ -165,6 +185,8 @@ export const asyncBlock = (
 /**
  * Promise-any strategy:
  * Check all endpoints' health in parallel, use the first one that responds healthy.
+ * 
+ * Body is buffered once at the start before forwarding.
  */
 export const promiseAny = (
     endpoints: ReadonlyArray<Endpoint>,
@@ -179,6 +201,11 @@ export const promiseAny = (
                 triedEndpoints: [],
             })
         }
+
+        // Buffer body once before forwarding
+        const bufferedBody: BufferedBody = yield* bufferRequestBody(request).pipe(
+            Effect.catchAll(() => Effect.succeed(null)),
+        )
 
         // Race all health checks, first healthy wins
         const healthyEndpointResult = yield* Effect.raceAll(
@@ -202,10 +229,11 @@ export const promiseAny = (
         const endpoint = healthyEndpointResult.value
         const gatherTime = Date.now()
 
-        const response = yield* forwardRequest(endpoint, request).pipe(
+        // FIX #3: Report all endpoints as tried, not just the one that failed
+        const response = yield* forwardRequest(endpoint, request, bufferedBody).pipe(
             Effect.mapError((error) =>
                 new NoHealthyEndpointsError({
-                    triedEndpoints: [endpoint],
+                    triedEndpoints: [...endpoints],  // Fixed: was [endpoint]
                     lastError: error,
                 }),
             ),

@@ -65,16 +65,22 @@ export type AvailabilityMethod = typeof AvailabilityMethod.Type;
 /**
  * Fail-forward strategy:
  * Try endpoints in order, failover only on specific status codes or network errors.
+ *
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export declare const failForward: (endpoints: ReadonlyArray<Endpoint>, request: Request, failoverStatuses?: ReadonlyArray<number>) => Effect.Effect<Response, NoHealthyEndpointsError>;
 /**
  * Async-block strategy:
  * Sequentially check each endpoint's health, use the first healthy one.
+ *
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export declare const asyncBlock: (endpoints: ReadonlyArray<Endpoint>, request: Request) => Effect.Effect<Response, NoHealthyEndpointsError, HealthChecker>;
 /**
  * Promise-any strategy:
  * Check all endpoints' health in parallel, use the first one that responds healthy.
+ *
+ * Body is buffered once at the start before forwarding.
  */
 export declare const promiseAny: (endpoints: ReadonlyArray<Endpoint>, request: Request) => Effect.Effect<Response, NoHealthyEndpointsError, HealthChecker>;
 //# sourceMappingURL=AvailabilityMethod.d.ts.map

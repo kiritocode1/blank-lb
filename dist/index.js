@@ -34,7 +34,7 @@ export { GeoEndpoint, geoEndpoint, GeoConfig, ContinentCode } from "./GeoEndpoin
 export { NoHealthyEndpointsError, EndpointUnhealthyError, CircuitOpenError, RequestForwardError, } from "./Errors.js";
 // Services
 export { LoadBalancer } from "./LoadBalancer.js";
-export { HealthChecker, HealthCheckerLive, HealthCheckerTest } from "./HealthChecker.js";
+export { HealthChecker, HealthCheckerLive, HealthCheckerTest, makeHealthChecker, getHealthCheckTimeout, DEFAULT_HEALTH_CHECK_TIMEOUT_MS, } from "./HealthChecker.js";
 // Availability methods
 export { AvailabilityMethod, AvailabilityMethodType, FailForwardOptions, AsyncBlockOptions, PromiseAnyOptions, DEFAULT_FAILOVER_STATUSES, failForward, asyncBlock, promiseAny, } from "./AvailabilityMethod.js";
 // Geo steering
@@ -44,5 +44,5 @@ export { withRecovery } from "./Recovery.js";
 // Headers
 export { HEADERS, addLoadBalancerHeaders } from "./Headers.js";
 // Forward
-export { forwardRequest } from "./Forward.js";
+export { forwardRequest, bufferRequestBody, methodSupportsBody, } from "./Forward.js";
 //# sourceMappingURL=index.js.map

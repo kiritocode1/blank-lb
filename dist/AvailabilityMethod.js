@@ -5,7 +5,7 @@
  */
 import { Effect, Schema } from "effect";
 import { NoHealthyEndpointsError } from "./Errors.js";
-import { forwardRequest } from "./Forward.js";
+import { bufferRequestBody, forwardRequest } from "./Forward.js";
 import { addLoadBalancerHeaders } from "./Headers.js";
 import { HealthChecker } from "./HealthChecker.js";
 /**
@@ -48,15 +48,22 @@ export const AvailabilityMethod = Schema.Union(FailForwardOptions, AsyncBlockOpt
 /**
  * Fail-forward strategy:
  * Try endpoints in order, failover only on specific status codes or network errors.
+ *
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export const failForward = (endpoints, request, failoverStatuses = [...DEFAULT_FAILOVER_STATUSES]) => Effect.gen(function* () {
     const startTime = Date.now();
     const tried = [];
     let lastError;
+    // Buffer body once for all retry attempts (fixes body consumption issue)
+    const bufferedBody = yield* bufferRequestBody(request).pipe(Effect.catchAll((error) => {
+        lastError = error;
+        return Effect.succeed(null);
+    }));
     for (const endpoint of endpoints) {
         tried.push(endpoint);
         const gatherTime = Date.now();
-        const result = yield* forwardRequest(endpoint, request).pipe(Effect.either);
+        const result = yield* forwardRequest(endpoint, request, bufferedBody).pipe(Effect.either);
         if (result._tag === "Right") {
             const response = result.right;
             // Check if we should failover based on status code
@@ -79,19 +86,26 @@ export const failForward = (endpoints, request, failoverStatuses = [...DEFAULT_F
 /**
  * Async-block strategy:
  * Sequentially check each endpoint's health, use the first healthy one.
+ *
+ * Body is buffered once at the start to support retry across multiple endpoints.
  */
 export const asyncBlock = (endpoints, request) => Effect.gen(function* () {
     const startTime = Date.now();
     const checker = yield* HealthChecker;
     const tried = [];
     let lastError;
+    // Buffer body once for all retry attempts
+    const bufferedBody = yield* bufferRequestBody(request).pipe(Effect.catchAll((error) => {
+        lastError = error;
+        return Effect.succeed(null);
+    }));
     for (const endpoint of endpoints) {
         tried.push(endpoint);
         const gatherTime = Date.now();
         const healthResult = yield* checker.check(endpoint).pipe(Effect.either);
         if (healthResult._tag === "Right") {
             // Endpoint is healthy, forward the request
-            const forwardResult = yield* forwardRequest(endpoint, request).pipe(Effect.either);
+            const forwardResult = yield* forwardRequest(endpoint, request, bufferedBody).pipe(Effect.either);
             if (forwardResult._tag === "Right") {
                 return addLoadBalancerHeaders(forwardResult.right, endpoint, tried, startTime, gatherTime);
             }
@@ -109,6 +123,8 @@ export const asyncBlock = (endpoints, request) => Effect.gen(function* () {
 /**
  * Promise-any strategy:
  * Check all endpoints' health in parallel, use the first one that responds healthy.
+ *
+ * Body is buffered once at the start before forwarding.
  */
 export const promiseAny = (endpoints, request) => Effect.gen(function* () {
     const startTime = Date.now();
@@ -118,6 +134,8 @@ export const promiseAny = (endpoints, request) => Effect.gen(function* () {
             triedEndpoints: [],
         });
     }
+    // Buffer body once before forwarding
+    const bufferedBody = yield* bufferRequestBody(request).pipe(Effect.catchAll(() => Effect.succeed(null)));
     // Race all health checks, first healthy wins
     const healthyEndpointResult = yield* Effect.raceAll(endpoints.map((endpoint) => checker.check(endpoint).pipe(Effect.map(() => endpoint), Effect.catchAll(() => Effect.never)))).pipe(Effect.timeout("10 seconds"), Effect.option);
     if (healthyEndpointResult._tag === "None") {
@@ -127,8 +145,9 @@ export const promiseAny = (endpoints, request) => Effect.gen(function* () {
     }
     const endpoint = healthyEndpointResult.value;
     const gatherTime = Date.now();
-    const response = yield* forwardRequest(endpoint, request).pipe(Effect.mapError((error) => new NoHealthyEndpointsError({
-        triedEndpoints: [endpoint],
+    // FIX #3: Report all endpoints as tried, not just the one that failed
+    const response = yield* forwardRequest(endpoint, request, bufferedBody).pipe(Effect.mapError((error) => new NoHealthyEndpointsError({
+        triedEndpoints: [...endpoints], // Fixed: was [endpoint]
         lastError: error,
     })));
     return addLoadBalancerHeaders(response, endpoint, [endpoint], startTime, gatherTime);
