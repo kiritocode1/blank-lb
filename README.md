@@ -1,5 +1,9 @@
 # @blank-utils/load-balancer
 
+
+<img width="560" height="205" alt="SCR-20260203-mcrs" src="https://github.com/user-attachments/assets/efae35d7-fb47-4310-bd8c-a84df20e72d0" />
+
+
 > A type-safe, composable load balancer for Cloudflare Workers built with Effect-TS
 
 [![npm version](https://img.shields.io/npm/v/@blank-utils/load-balancer.svg)](https://www.npmjs.com/package/@blank-utils/load-balancer)
